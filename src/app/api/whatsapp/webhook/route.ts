@@ -406,16 +406,31 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // ---------- إنشاء مهمة متابعة للحالات المهمة ----------
+        // ---------- مهمة متابعة: متابعة واحدة مفتوحة لكل عميل (لا تتكرر مع كل رسالة) ----------
         if (needsFollowUp) {
-          await prisma.followUp.create({
-            data: {
-              contactId: contact.id,
-              dueDate: new Date(Date.now() + 24 * 36e5),
-              priority: "HIGH",
-              notes: `تصنيف تلقائي: ${result.leadClassification}`,
-            },
+          const openFollowUp = await prisma.followUp.findFirst({
+            where: { contactId: contact.id, status: "PENDING" },
           });
+          if (openFollowUp) {
+            // حدّث المتابعة المفتوحة الموجودة بدل إنشاء واحدة جديدة
+            await prisma.followUp.update({
+              where: { id: openFollowUp.id },
+              data: {
+                dueDate: new Date(Date.now() + 24 * 36e5),
+                priority: "HIGH",
+                notes: `تصنيف تلقائي: ${result.leadClassification}`,
+              },
+            });
+          } else {
+            await prisma.followUp.create({
+              data: {
+                contactId: contact.id,
+                dueDate: new Date(Date.now() + 24 * 36e5),
+                priority: "HIGH",
+                notes: `تصنيف تلقائي: ${result.leadClassification}`,
+              },
+            });
+          }
         }
 
         // ---------- الرد التلقائي (داخل نافذة 24 ساعة فقط) ----------
