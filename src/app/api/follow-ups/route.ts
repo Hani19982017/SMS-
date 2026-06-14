@@ -5,14 +5,21 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const followUps = await prisma.followUp.findMany({
     orderBy: [{ status: "asc" }, { dueDate: "asc" }],
-    take: 200,
+    take: 500,
     include: {
       contact: { include: { conversation: { select: { id: true } } } },
       assignedAgent: true,
     },
   });
+  // متابعة واحدة فقط لكل عميل (نحتفظ بالأولى حسب الترتيب: المعلّقة ثم الأقرب موعدًا)
+  const seen = new Set<string>();
+  const unique = followUps.filter((f) => {
+    if (seen.has(f.contactId)) return false;
+    seen.add(f.contactId);
+    return true;
+  });
   return NextResponse.json({
-    followUps: followUps.map((f) => ({
+    followUps: unique.map((f) => ({
       id: f.id,
       name: f.contact.name,
       phone: f.contact.phone,
