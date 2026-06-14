@@ -1,0 +1,307 @@
+// =============================================================
+//  مخطط قاعدة البيانات (Prisma + PostgreSQL)
+//  نظام التسويق العقاري عبر واتساب
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------- المستخدمون -----------------------
+enum UserRole {
+  ADMIN // مدير
+  AGENT // مندوب مبيعات
+  VIEWER // مشاهد فقط
+}
+
+model User {
+  id            String        @id @default(cuid())
+  name          String
+  email         String        @unique
+  passwordHash  String
+  role          UserRole      @default(AGENT)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // علاقات
+  assignedConversations Conversation[] @relation("AgentConversations")
+  assignedFollowUps     FollowUp[]
+  createdCampaigns      Campaign[]
+}
+
+// ----------------------- جهات الاتصال -----------------------
+model Contact {
+  id            String        @id @default(cuid())
+  name          String?
+  phone         String        @unique // مخزّن بصيغة دولية E.164 مثل +201001234567
+  rawPhone      String?       // الرقم كما تم رفعه قبل التطبيع
+  city          String?
+  area          String?
+  source        String?       // مصدر الرقم (إعلان، قائمة، إلخ)
+  notes         String?
+  optIn         Boolean       @default(false) // موافقة العميل على استلام الرسائل
+  optInDate     DateTime?
+  isValid       Boolean       @default(true)  // هل الرقم صالح بعد التحقق
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // علاقات
+  conversation     Conversation?
+  campaignMessages CampaignMessage[]
+  properties       Property[]
+  followUps        FollowUp[]
+
+  @@index([city])
+  @@index([area])
+  @@index([optIn])
+}
+
+// ----------------------- أرقام واتساب -----------------------
+// تصميم يسمح بإضافة أكثر من رقم مستقبلاً
+model WhatsappAccount {
+  id              String   @id @default(cuid())
+  label           String   // اسم وصفي للرقم
+  phoneNumberId   String   @unique // Phone Number ID من Meta
+  businessAccountId String?
+  displayNumber   String?  // الرقم الظاهر للعملاء
+  accessToken     String?  // توكن خاص بهذا الرقم (اختياري، الافتراضي من env)
+  isActive        Boolean  @default(true)
+  qualityRating   String?  // GREEN / YELLOW / RED
+  createdAt       DateTime @default(now())
+
+  campaigns Campaign[]
+  messages  Message[]
+}
+
+// ----------------------- القوالب -----------------------
+model Template {
+  id            String   @id @default(cuid())
+  name          String   @unique // اسم القالب المعتمد في Meta
+  language      String   @default("ar")
+  category      String?  // MARKETING / UTILITY / AUTHENTICATION
+  bodyText      String   @db.Text // نص القالب للعرض الداخلي
+  variableCount Int      @default(0)
+  status        String   @default("APPROVED")
+  createdAt     DateTime @default(now())
+
+  campaigns Campaign[]
+}
+
+// ----------------------- الحملات -----------------------
+enum CampaignStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+model Campaign {
+  id              String         @id @default(cuid())
+  name            String
+  status          CampaignStatus @default(DRAFT)
+  templateId      String?
+  template        Template?      @relation(fields: [templateId], references: [id])
+  templateVars    Json?          // متغيرات القالب الافتراضية
+  sendDelaySec    Int            @default(20) // الفاصل الزمني بين الرسائل بالثواني
+  scheduledAt     DateTime?      // موعد بدء الإرسال
+  whatsappId      String?
+  whatsapp        WhatsappAccount? @relation(fields: [whatsappId], references: [id])
+  createdById     String?
+  createdBy       User?          @relation(fields: [createdById], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  messages CampaignMessage[]
+}
+
+// ----------------------- رسائل الحملة (طابور الإرسال) -----------------------
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  REPLIED
+}
+
+model CampaignMessage {
+  id            String        @id @default(cuid())
+  campaignId    String
+  campaign      Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId     String
+  contact       Contact       @relation(fields: [contactId], references: [id])
+  status        MessageStatus @default(PENDING)
+  waMessageId   String?       // معرّف الرسالة من واتساب
+  errorMessage  String?
+  scheduledAt   DateTime?     // متى يُسمح بإرسالها (للتحكم في السرعة)
+  sentAt        DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@index([campaignId, status])
+  @@index([status, scheduledAt])
+}
+
+// ----------------------- المحادثات -----------------------
+enum ConversationStatus {
+  NEW
+  IN_PROGRESS
+  NEEDS_FOLLOWUP
+  CLOSED
+}
+
+model Conversation {
+  id              String             @id @default(cuid())
+  contactId       String             @unique
+  contact         Contact            @relation(fields: [contactId], references: [id])
+  status          ConversationStatus @default(NEW)
+  classification  String?            // آخر تصنيف من الذكاء الاصطناعي
+  aiSummary       String?            @db.Text
+  lastMessageAt   DateTime?
+  lastInboundAt   DateTime?          // آخر رسالة واردة من العميل (لحساب نافذة 24 ساعة)
+  assignedAgentId String?
+  assignedAgent   User?              @relation("AgentConversations", fields: [assignedAgentId], references: [id])
+  internalNotes   String?            @db.Text
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  messages    Message[]
+  aiAnalyses  AiAnalysis[]
+  properties  Property[]
+  mediaAssets MediaAsset[]
+
+  @@index([status])
+  @@index([classification])
+}
+
+// ----------------------- الرسائل (سجل المحادثة الكامل) -----------------------
+enum MessageDirection {
+  INBOUND // من العميل
+  OUTBOUND // منا
+}
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      MessageDirection
+  body           String           @db.Text
+  waMessageId    String?          @unique
+  status         MessageStatus?
+  isAutoReply    Boolean          @default(false)
+  whatsappId     String?
+  whatsapp       WhatsappAccount? @relation(fields: [whatsappId], references: [id])
+  media          MediaAsset[]
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+/// وسائط واردة (صور/فيديو/مستندات) محفوظة من ردود العملاء
+model MediaAsset {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId      String?
+  message        Message?     @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  waMediaId      String?
+  mimeType       String?
+  caption        String?      @db.Text
+  data           Bytes
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+// ----------------------- تحليل الذكاء الاصطناعي -----------------------
+model AiAnalysis {
+  id              String       @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sourceMessage   String       @db.Text
+  classification  String
+  confidence      Float        @default(0)
+  recommendedAction String?
+  suggestedReply  String?      @db.Text
+  rawJson         Json         // المخرجات الكاملة من الموديل
+  provider        String       // openai / claude
+  createdAt       DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+// ----------------------- العقارات -----------------------
+model Property {
+  id              String   @id @default(cuid())
+  ownerContactId  String?
+  ownerContact    Contact? @relation(fields: [ownerContactId], references: [id])
+  conversationId  String?
+  conversation    Conversation? @relation(fields: [conversationId], references: [id])
+  city            String?
+  area            String?  // المنطقة / الكمبوند (مكان العقار) — ليست المساحة
+  sizeSqm         Float?   // المساحة بالمتر المربع
+  propertyType    String?  // شقة / فيلا / محل ...
+  unitType        String?
+  bedrooms        Int?
+  bathrooms       Int?
+  floor           String?
+  furnishedStatus String?  // مفروش / غير مفروش / نص فرش
+  finishingStatus String?  // حالة التشطيب (سوبر لوكس / نص تشطيب / على المحارة …)
+  airConditioning String?  // تكييفات (يوجد / لا يوجد / العدد)
+  kitchen         String?  // مطبخ (يوجد / مجهز / لا يوجد)
+  garage          String?  // جراج (يوجد / لا يوجد)
+  features        String?  @db.Text // مميزات إضافية
+  price           Float?
+  paymentType     String?  // كاش / تقسيط / إيجار
+  availability    String?  // متاح / غير متاح / تم التأجير
+  ownerPhone      String?
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([city])
+  @@index([area])
+  @@index([price])
+  @@index([bedrooms])
+  @@index([availability])
+}
+
+// ----------------------- المتابعات -----------------------
+enum FollowUpStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
+enum FollowUpPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model FollowUp {
+  id            String           @id @default(cuid())
+  contactId     String
+  contact       Contact          @relation(fields: [contactId], references: [id])
+  assignedAgentId String?
+  assignedAgent User?            @relation(fields: [assignedAgentId], references: [id])
+  dueDate       DateTime
+  status        FollowUpStatus   @default(PENDING)
+  priority      FollowUpPriority @default(MEDIUM)
+  notes         String?          @db.Text
+  createdAt     DateTime         @default(now())
+
+  @@index([status, dueDate])
+}
+
+// ----------------------- الإعدادات (مفتاح/قيمة) -----------------------
+model Setting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,61 @@
+# مخطط نشر Render (Blueprint)
+# يُنشئ: خدمة ويب + قاعدة PostgreSQL + مهمة Cron للإرسال التدريجي.
+# ارفع المشروع على GitHub ثم اختر "New > Blueprint" في Render وأشر لهذا الملف.
+
+databases:
+  - name: aqar-db
+    plan: free
+    databaseName: aqar
+    user: aqar
+
+services:
+  # ----- خدمة الويب (Next.js) -----
+  - type: web
+    name: aqar-wa
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /login
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aqar-db
+          property: connectionString
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_BUSINESS_ACCOUNT_ID
+        sync: false
+      - key: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: AI_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true
+
+  # ----- مهمة Cron: تستدعي مُرسِل الحملات كل دقيقة -----
+  - type: cron
+    name: aqar-sender
+    runtime: node
+    plan: free
+    schedule: "* * * * *"
+    buildCommand: npm install
+    startCommand: >
+      node -e "fetch(process.env.APP_URL + '/api/cron/send', {method:'POST',
+      headers:{Authorization:'Bearer '+process.env.CRON_SECRET}})
+      .then(r=>r.text()).then(console.log).catch(console.error)"
+    envVars:
+      - key: APP_URL
+        sync: false      # ضع رابط خدمة الويب هنا
+      - key: CRON_SECRET
+        sync: false      # نفس قيمة CRON_SECRET في خدمة الويب

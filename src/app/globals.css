@@ -1,0 +1,38 @@
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@500;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #1f8f5f;
+  --brand-dark: #0e5f3e;
+  --ink: #0e1626;
+}
+
+html,
+body {
+  background: var(--sand, #f6f4ef);
+  color: var(--ink);
+  font-family: "Cairo", "Tajawal", system-ui, sans-serif;
+}
+
+/* بطاقة قياسية */
+.card {
+  @apply bg-white rounded-2xl shadow-card border border-black/5;
+}
+
+/* شارة حالة */
+.badge {
+  @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
+}
+
+/* خلفية بنمط نقطي خفيف يعطي عمقًا للوحة */
+.dotted-bg {
+  background-image: radial-gradient(rgba(14, 22, 38, 0.05) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+/* شريط التمرير */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #d8d3c8; border-radius: 8px; }

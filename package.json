@@ -1,0 +1,50 @@
+{
+  "name": "aqar-wa",
+  "version": "1.0.0",
+  "description": "نظام تسويق عقاري متكامل عبر واتساب مع تحليل ذكاء اصطناعي",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && prisma migrate deploy && next build",
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "db:seed": "node prisma/seed.ts",
+    "worker:send": "node scripts/send-worker.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "next": "14.2.18",
+    "next-auth": "^4.24.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "bcryptjs": "^2.4.3",
+    "zod": "^3.23.8",
+    "papaparse": "^5.4.1",
+    "xlsx": "^0.18.5",
+    "jszip": "^3.10.1",
+    "nodemailer": "^7.0.7",
+    "libphonenumber-js": "^1.11.14",
+    "openai": "^4.73.0",
+    "@anthropic-ai/sdk": "^0.32.1",
+    "lucide-react": "^0.460.0",
+    "clsx": "^2.1.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.17.6",
+    "@types/nodemailer": "^6.4.17",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.15",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
