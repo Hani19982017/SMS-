@@ -62,7 +62,7 @@ export default function PropertiesPage() {
       </div>
 
       <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm whitespace-nowrap">
           <thead>
             <tr className="text-ink-800/50 text-center border-b bg-sand/40">
               <th className="py-3 px-4 font-medium text-center">المنطقة</th>
@@ -71,6 +71,15 @@ export default function PropertiesPage() {
               <th className="py-3 px-4 font-medium text-center">العميل</th>
               <th className="py-3 px-4 font-medium text-center">بائع/مشتري</th>
               <th className="py-3 px-4 font-medium text-center">الغرف</th>
+              <th className="py-3 px-4 font-medium text-center">الحمامات</th>
+              <th className="py-3 px-4 font-medium text-center">الدور</th>
+              <th className="py-3 px-4 font-medium text-center">الفرش</th>
+              <th className="py-3 px-4 font-medium text-center">التشطيب</th>
+              <th className="py-3 px-4 font-medium text-center">التكييفات</th>
+              <th className="py-3 px-4 font-medium text-center">المطبخ</th>
+              <th className="py-3 px-4 font-medium text-center">الجراج</th>
+              <th className="py-3 px-4 font-medium text-center">مميزات</th>
+              <th className="py-3 px-4 font-medium text-center">التعامل</th>
               <th className="py-3 px-4 font-medium text-center">السعر</th>
               <th className="py-3 px-4 font-medium text-center">التوفر</th>
               <th className="py-3 px-4 font-medium text-center">صور</th>
@@ -78,7 +87,7 @@ export default function PropertiesPage() {
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="py-8 text-center text-ink-800/40">لا توجد عقارات بعد</td></tr>
+              <tr><td colSpan={18} className="py-8 text-center text-ink-800/40">لا توجد عقارات بعد</td></tr>
             )}
             {rows.map((p) => {
               const kind = clientKind(p.classification);
@@ -94,6 +103,15 @@ export default function PropertiesPage() {
                   <td className="py-3 px-4 text-center">{p.ownerName || (p.ownerPhone ? p.ownerPhone : "—")}</td>
                   <td className="py-3 px-4 text-center"><span className={`badge ${kind.cls}`}>{kind.ar}</span></td>
                   <td className="py-3 px-4 text-center">{p.bedrooms ?? "—"}</td>
+                  <td className="py-3 px-4 text-center">{p.bathrooms ?? "—"}</td>
+                  <td className="py-3 px-4 text-center">{p.floor ?? "—"}</td>
+                  <td className="py-3 px-4 text-center">{toAr(p.furnishedStatus)}</td>
+                  <td className="py-3 px-4 text-center">{toAr(p.finishingStatus)}</td>
+                  <td className="py-3 px-4 text-center">{toAr(p.airConditioning)}</td>
+                  <td className="py-3 px-4 text-center">{toAr(p.kitchen)}</td>
+                  <td className="py-3 px-4 text-center">{toAr(p.garage)}</td>
+                  <td className="py-3 px-4 text-center">{p.features || "—"}</td>
+                  <td className="py-3 px-4 text-center">{toAr(p.paymentType)}</td>
                   <td className="py-3 px-4 font-semibold text-center">{p.price ? p.price.toLocaleString() : "—"}</td>
                   <td className="py-3 px-4 text-center">{toAr(p.availability)}</td>
                   <td className="py-3 px-4 text-center">
