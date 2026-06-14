@@ -50,14 +50,20 @@ function buildStateNote(p: any): string {
   // الحقول التي نجمعها بالترتيب، مع تسميتها العربية
   const fields: [string, string][] = [
     ["paymentType", "نوع التعامل (بيع/إيجار)"],
-    ["propertyType", "نوع العقار"],
-    ["city", "المدينة"],
+    ["ownerName", "اسم المالك"],
+    ["propertyType", "نوع الوحدة"],
     ["area", "المنطقة / الكمبوند (المكان)"],
     ["sizeSqm", "المساحة بالمتر"],
+    ["floor", "رقم الدور"],
     ["bedrooms", "عدد غرف النوم"],
     ["bathrooms", "عدد الحمامات"],
     ["furnishedStatus", "حالة الفرش"],
-    ["price", "السعر"],
+    ["price", "السعر المطلوب"],
+    ["airConditioning", "التكييفات"],
+    ["kitchen", "المطبخ"],
+    ["garage", "الجراج"],
+    ["finishingStatus", "حالة التشطيب"],
+    ["features", "مميزات إضافية"],
   ];
 
   const has = (k: string) =>
@@ -259,7 +265,7 @@ export async function POST(req: NextRequest) {
         where: { conversationId: conversation.id },
         orderBy: { createdAt: "asc" },
       });
-      const systemPrompt = basePrompt + buildStateNote(knownProp);
+      const systemPrompt = basePrompt + buildStateNote({ ...knownProp, ownerName: contact.name });
 
       const { result, provider: usedProvider } = await analyzeReply(analyzable, {
         provider,
@@ -304,6 +310,16 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // ---------- اسم المالك: احفظه على جهة الاتصال إن ذُكر ولم يكن محفوظًا ----------
+        const extractedName = result.property?.ownerName?.toString().trim();
+        if (extractedName && !contact.name) {
+          await prisma.contact.update({
+            where: { id: contact.id },
+            data: { name: extractedName },
+          });
+          contact.name = extractedName; // حدّث النسخة المحلية أيضًا
+        }
+
         // ---------- سجل العقار: أنشئ أو كمّل بأي بيانات جديدة من كلام الزبون ----------
         const hasAnyPropertyField =
           result.property && Object.values(result.property).some((v) => v !== null && v !== undefined && v !== "");
@@ -334,6 +350,11 @@ export async function POST(req: NextRequest) {
             bathrooms: toInt(p.bathrooms),
             floor: toStr(p.floor),
             furnishedStatus: toStr(p.furnishedStatus),
+            finishingStatus: toStr(p.finishingStatus),
+            airConditioning: toStr(p.airConditioning),
+            kitchen: toStr(p.kitchen),
+            garage: toStr(p.garage),
+            features: toStr(p.features),
             price: toFloat(p.price),
             paymentType: toStr(p.paymentType),
             availability: toStr(p.availability),
