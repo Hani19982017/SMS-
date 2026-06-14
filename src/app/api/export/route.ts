@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
     const data = await prisma.property.findMany();
     rows = data.map((p) => ({
       المدينة: p.city, المنطقة: p.area, "المساحة م²": p.sizeSqm, النوع: p.propertyType, "الغرف": p.bedrooms,
-      "الحمامات": p.bathrooms, الفرش: p.furnishedStatus, السعر: p.price,
+      "الحمامات": p.bathrooms, الفرش: p.furnishedStatus, "التشطيب": p.finishingStatus,
+      "التكييفات": p.airConditioning, "المطبخ": p.kitchen, "الجراج": p.garage, "مميزات إضافية": p.features,
+      السعر: p.price,
       "التوفر": p.availability, "هاتف المالك": p.ownerPhone, ملاحظات: p.notes,
     }));
     filename = "properties.xlsx";
