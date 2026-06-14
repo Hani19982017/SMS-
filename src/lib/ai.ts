@@ -31,6 +31,12 @@ export interface AiResult {
     bathrooms?: number | null;
     floor?: string | null;
     furnishedStatus?: string | null;
+    finishingStatus?: string | null;
+    airConditioning?: string | null;
+    kitchen?: string | null;
+    garage?: string | null;
+    features?: string | null;
+    ownerName?: string | null;
     price?: number | null;
     paymentType?: string | null;
     availability?: string | null;
@@ -73,6 +79,8 @@ export const DEFAULT_SYSTEM_PROMPT = `أنت مساعد متخصص في تحلي
   "property": {
     "city": null, "area": null, "sizeSqm": null, "propertyType": null, "unitType": null,
     "bedrooms": null, "bathrooms": null, "floor": null, "furnishedStatus": null,
+    "finishingStatus": null, "airConditioning": null, "kitchen": null, "garage": null,
+    "features": null, "ownerName": null,
     "price": null, "paymentType": null, "availability": null,
     "ownerPhone": null, "notes": null
   },
@@ -80,6 +88,14 @@ export const DEFAULT_SYSTEM_PROMPT = `أنت مساعد متخصص في تحلي
   "suggestedReply": "..."
 }
 إن لم تتوفر بيانات عقار اجعل property = null. confidence بين 0 و 1.
+
+معاني الحقول الجديدة (استخدم نفس المفاتيح الإنجليزية بالضبط):
+- finishingStatus = حالة التشطيب (سوبر لوكس / نص تشطيب / على المحارة …).
+- airConditioning = التكييفات (يوجد / لا يوجد، أو العدد إن ذُكر).
+- kitchen = المطبخ (يوجد / مجهز / لا يوجد).
+- garage = الجراج (يوجد / لا يوجد).
+- features = أي مميزات إضافية ذكرها العميل (نص).
+- ownerName = اسم المالك إن ذكره.
 
 تحذير صارم: استخدم أسماء الحقول الإنجليزية بالضبط كما هي أعلاه
 (leadClassification, confidence, property, propertyType, bedrooms, price, area, city, recommendedAction, suggestedReply).
@@ -111,7 +127,13 @@ function normalize(obj: any): AiResult | null {
     bedrooms: pick("bedrooms", "number_of_rooms", "rooms", "roomsCount", "عدد_الغرف", "الغرف", "عدد الغرف"),
     bathrooms: pick("bathrooms", "number_of_bathrooms", "الحمامات", "عدد_الحمامات"),
     floor: pick("floor", "الدور", "الطابق"),
-    furnishedStatus: pick("furnishedStatus", "furnished", "furnishing", "الفرش", "حالة_الفرش", "التشطيب"),
+    furnishedStatus: pick("furnishedStatus", "furnished", "furnishing", "الفرش", "حالة_الفرش"),
+    finishingStatus: pick("finishingStatus", "finishing", "التشطيب", "حالة_التشطيب", "التشطيبات"),
+    airConditioning: pick("airConditioning", "ac", "hasAc", "aircon", "التكييف", "التكييفات", "تكييفات", "تكييف"),
+    kitchen: pick("kitchen", "hasKitchen", "المطبخ", "مطبخ"),
+    garage: pick("garage", "hasGarage", "parking", "الجراج", "جراج", "الموقف", "الكراج"),
+    features: pick("features", "extraFeatures", "amenities", "المميزات", "مميزات", "مميزات_اضافية", "مميزات_إضافية"),
+    ownerName: pick("ownerName", "owner_name", "name", "اسم_المالك", "اسم المالك", "الاسم"),
     price: pick("price", "budget", "amount", "السعر", "الميزانية", "المبلغ"),
     paymentType: pick("paymentType", "payment_type", "dealType", "deal_type", "نوع_التعامل", "نوع_الدفع", "طريقة_الدفع"),
     availability: pick("availability", "status", "التوفر", "الحالة", "متاح"),
@@ -263,6 +285,12 @@ async function analyzeWithGemini(
                   bathrooms: { type: "integer", nullable: true },
                   floor: { type: "string", nullable: true },
                   furnishedStatus: { type: "string", nullable: true },
+                  finishingStatus: { type: "string", nullable: true },
+                  airConditioning: { type: "string", nullable: true },
+                  kitchen: { type: "string", nullable: true },
+                  garage: { type: "string", nullable: true },
+                  features: { type: "string", nullable: true },
+                  ownerName: { type: "string", nullable: true },
                   price: { type: "number", nullable: true },
                   paymentType: { type: "string", nullable: true },
                   availability: { type: "string", nullable: true },
