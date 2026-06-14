@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
       id: pr.id,
       area: pr.area,
       city: pr.city,
+      sizeSqm: pr.sizeSqm,
       propertyType: pr.propertyType,
       bedrooms: pr.bedrooms,
       furnishedStatus: pr.furnishedStatus,
