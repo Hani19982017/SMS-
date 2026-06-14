@@ -66,9 +66,14 @@ export default function PropertyDetailPage() {
           <Row label="الحمامات" value={pr.bathrooms} />
           <Row label="الدور" value={pr.floor} />
           <Row label="الفرش" value={toAr(pr.furnishedStatus)} />
+          <Row label="حالة التشطيب" value={toAr(pr.finishingStatus)} />
+          <Row label="التكييفات" value={toAr(pr.airConditioning)} />
+          <Row label="المطبخ" value={toAr(pr.kitchen)} />
+          <Row label="الجراج" value={toAr(pr.garage)} />
           <Row label="السعر" value={pr.price ? pr.price.toLocaleString() : "—"} />
           <Row label="نوع التعامل" value={toAr(pr.paymentType)} />
           <Row label="التوفر" value={toAr(pr.availability)} />
+          {pr.features && <Row label="مميزات إضافية" value={pr.features} />}
           {pr.notes && <Row label="ملاحظات" value={pr.notes} />}
         </div>
 
