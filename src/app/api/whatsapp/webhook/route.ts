@@ -92,6 +92,29 @@ ${knownBlock}
 }
 
 /**
+ * الحقول التي نتتبّعها لعقار واحد. يُعتبر العقار «مكتملًا» عند امتلائها جميعًا،
+ * وعندها تُعامَل أي رسالة جديدة (داخل المهلة) كعقار/استفسار جديد.
+ */
+const TRACKED_FIELDS = [
+  "paymentType", "propertyType", "area", "sizeSqm", "floor",
+  "bedrooms", "bathrooms", "furnishedStatus", "price",
+  "airConditioning", "kitchen", "garage", "finishingStatus", "features",
+];
+function isPropertyComplete(p: any): boolean {
+  if (!p) return false;
+  const has = (k: string) =>
+    p[k] !== null && p[k] !== undefined && String(p[k]).trim() !== "";
+  return TRACKED_FIELDS.every((k) => has(k));
+}
+
+/**
+ * الفاصل الزمني (بالساعات) الذي بعده تُعتبر رسالة العميل بداية «استفسار/عقار جديد».
+ * قابل للتعديل عبر متغيّر البيئة NEW_INQUIRY_GAP_HOURS (الافتراضي 12 ساعة).
+ */
+const NEW_INQUIRY_GAP_HOURS = Number(process.env.NEW_INQUIRY_GAP_HOURS || 12);
+const NEW_INQUIRY_GAP_MS = NEW_INQUIRY_GAP_HOURS * 60 * 60 * 1000;
+
+/**
  * تنزيل وسائط واردة من Meta:
  * 1) جلب رابط الوسائط المؤقّت عبر معرّف الوسائط.
  * 2) تنزيل البايتات (الرابط محمي بالتوكن وصالح ~5 دقائق فقط).
@@ -192,6 +215,10 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // وقت آخر رسالة واردة سابقة — نلتقطه قبل تحديثه بالأسفل،
+      // لنكشف «استفسارًا جديدًا» بعد انقطاع طويل (مدة من الأيام مثلًا).
+      const prevInboundAt = conversation.lastInboundAt ?? null;
+
       // تجنّب التكرار عبر waMessageId الفريد
       const exists = await prisma.message.findUnique({ where: { waMessageId } });
       if (exists) continue;
@@ -260,12 +287,49 @@ export async function POST(req: NextRequest) {
           content: m.body || "",
         }));
 
-      // ما هو معروف بالفعل عن عقار هذه المحادثة — لمنع تكرار الأسئلة
-      const knownProp = await prisma.property.findFirst({
+      // ما هو معروف بالفعل عن العقار النشط لهذه المحادثة — لمنع تكرار الأسئلة.
+      // أحدث عقار في المحادثة (إن وُجد):
+      const latestProp = await prisma.property.findFirst({
         where: { conversationId: conversation.id },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
       });
-      const systemPrompt = basePrompt + buildStateNote({ ...knownProp, ownerName: contact.name });
+
+      // المُحفِّز الأساسي: هل يردّ العميل على حملة/قالب جديد أُرسل من «عقار واتساب»
+      // بعد إنشاء العقار الحالي؟ إن كان كذلك ⇒ هذا استفسار/عقار جديد.
+      // (نعتمد على sentAt لرسالة الحملة، وهو ثابت بغضّ النظر عن حالة الرسالة لاحقًا)
+      const lastSend = await prisma.campaignMessage.findFirst({
+        where: { contactId: contact.id, sentAt: { not: null } },
+        orderBy: { sentAt: "desc" },
+      });
+      const repliedToNewCampaign =
+        !!lastSend?.sentAt &&
+        (!latestProp ||
+          new Date(lastSend.sentAt).getTime() > new Date(latestProp.createdAt).getTime());
+
+      // مُحفِّز احتياطي زمني (اختياري): يُفيد العميل الذي يراسلك تلقائيًا دون حملة.
+      // عطّله تمامًا بوضع NEW_INQUIRY_GAP_HOURS=0 لتعتمد على القوالب فقط.
+      const gapEnabled = NEW_INQUIRY_GAP_MS > 0;
+      const gapMs = prevInboundAt
+        ? Date.now() - new Date(prevInboundAt).getTime()
+        : Number.POSITIVE_INFINITY;
+      const staleGap = gapEnabled && gapMs >= NEW_INQUIRY_GAP_MS;
+
+      // العقار «النشط» الذي تُجمع عليه بيانات هذه الرسالة:
+      //  - نكمّل على آخر عقار فقط إذا: موجود، ولم يردّ العميل على حملة أحدث،
+      //    ولم تمرّ مدة طويلة، ولم يكتمل العقار بعد.
+      //  - غير ذلك ⇒ activeProp = null: يُنشأ عقار جديد، وتبدأ الأسئلة من أوّلها،
+      //    وتبقى العقارات القديمة مخزّنة كما هي دون أي تعديل.
+      const activeProp =
+        latestProp &&
+        !repliedToNewCampaign &&
+        !staleGap &&
+        !isPropertyComplete(latestProp)
+          ? latestProp
+          : null;
+
+      // نحقن حالة العقار النشط فقط؛ فإن كان جديدًا تكون كل البيانات ناقصة ⇒ يسأل من البداية
+      const systemPrompt =
+        basePrompt + buildStateNote({ ...(activeProp || {}), ownerName: contact.name });
 
       const { result, provider: usedProvider } = await analyzeReply(analyzable, {
         provider,
@@ -364,11 +428,10 @@ export async function POST(req: NextRequest) {
           // أزل المفاتيح الفارغة حتى لا نمسح بيانات سابقة بقيم ناقصة
           Object.keys(incoming).forEach((k) => incoming[k] === undefined && delete incoming[k]);
 
-          // عقار واحد لكل محادثة: حدّث الموجود (وكمّل الناقص) ولا تُنشئ نسخة جديدة
-          const existingProp = await prisma.property.findFirst({
-            where: { conversationId: conversation.id },
-            orderBy: { createdAt: "asc" },
-          });
+          // العقار الذي نكتب عليه = العقار «النشط» المحدّد أعلاه.
+          // عند استفسار جديد يكون activeProp = null ⇒ نُنشئ عقارًا جديدًا،
+          // ونترك العقارات القديمة كما هي في قاعدة البيانات دون أي تعديل.
+          const existingProp = activeProp;
 
           if (existingProp) {
             // قاعدة الدمج:
