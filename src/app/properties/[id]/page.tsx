@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, MessageSquare, Phone, Download, X } from "lucide-react";
+import { ArrowRight, MessageSquare, Phone, Download, X, BadgeCheck, RotateCcw } from "lucide-react";
 import { toAr } from "@/lib/arabic";
 
 function clientKind(cls: string | null) {
@@ -26,6 +26,27 @@ export default function PropertyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [pr, setPr] = useState<any>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editingSold, setEditingSold] = useState(false);
+  const [profitInput, setProfitInput] = useState("");
+
+  async function setSold(isSold: boolean, profit?: string) {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/properties/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isSold, profit }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        setPr((prev: any) => ({ ...prev, isSold: d.isSold, soldAt: d.soldAt, profit: d.profit }));
+        setEditingSold(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     fetch(`/api/properties/${id}`).then((r) => r.json()).then(setPr).catch(() => {});
@@ -47,6 +68,9 @@ export default function PropertyDetailPage() {
               {toAr(pr.propertyType)} — {toAr(pr.area || pr.city)}
             </h1>
             <span className={`badge ${kind.cls} mt-1 inline-block`}>{kind.ar}</span>
+            {pr.isSold && (
+              <span className="badge bg-emerald-600 text-white mt-1 mr-2 inline-block">تم البيع</span>
+            )}
           </div>
         </div>
         <a href={`/api/properties/export-zip`} className="badge bg-brand-50 text-brand-700 px-4 py-2">
@@ -107,6 +131,78 @@ export default function PropertyDetailPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* حالة البيع */}
+      <div className="card p-5 mt-4">
+        <h2 className="font-bold text-ink-900 mb-3">حالة البيع</h2>
+        {pr.isSold ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-6 text-sm">
+              <span className="badge bg-emerald-600 text-white">تم البيع</span>
+              <span className="text-ink-800/60">
+                تاريخ البيع:{" "}
+                <b className="text-ink-900">
+                  {pr.soldAt ? new Date(pr.soldAt).toLocaleDateString("ar-EG") : "—"}
+                </b>
+              </span>
+              <span className="text-ink-800/60">
+                المكسب:{" "}
+                <b className="text-ink-900">
+                  {pr.profit != null ? Number(pr.profit).toLocaleString() : "—"}
+                </b>
+              </span>
+            </div>
+            <button
+              disabled={saving}
+              onClick={() => setSold(false)}
+              className="px-4 py-2 rounded-xl bg-black/5 text-ink-900 text-sm flex items-center gap-2 hover:bg-black/10 disabled:opacity-50"
+            >
+              <RotateCcw className="w-4 h-4" /> إلغاء البيع
+            </button>
+          </div>
+        ) : editingSold ? (
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs text-ink-800/50 mb-1">المكسب / العمولة من الصفقة</label>
+              <input
+                autoFocus
+                type="number"
+                value={profitInput}
+                onChange={(e) => setProfitInput(e.target.value)}
+                placeholder={pr.price ? String(pr.price) : "0"}
+                className="w-48 px-3 py-2 rounded-xl border border-black/10 outline-none text-sm"
+              />
+            </div>
+            <button
+              disabled={saving}
+              onClick={() => setSold(true, profitInput)}
+              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm flex items-center gap-2 disabled:opacity-50"
+            >
+              <BadgeCheck className="w-4 h-4" /> تأكيد البيع
+            </button>
+            <button
+              disabled={saving}
+              onClick={() => setEditingSold(false)}
+              className="px-4 py-2 rounded-xl bg-black/5 text-ink-900 text-sm"
+            >
+              إلغاء
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-ink-800/50">هذا العقار معروض حاليًا ولم يُبَع بعد.</p>
+            <button
+              onClick={() => {
+                setProfitInput(pr.price ? String(pr.price) : "");
+                setEditingSold(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm flex items-center gap-2"
+            >
+              <BadgeCheck className="w-4 h-4" /> تعليم كمُباع
+            </button>
+          </div>
+        )}
       </div>
 
       {/* صور العقار */}
