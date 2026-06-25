@@ -31,6 +31,10 @@ export default function PropertiesPage() {
   };
   useEffect(load, []);
 
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") load();
+  };
+
   return (
     <div>
       <header className="mb-6 flex items-center justify-between">
@@ -50,11 +54,11 @@ export default function PropertiesPage() {
 
       {/* فلاتر البحث */}
       <div className="card p-4 mb-4 flex flex-wrap items-center gap-2">
-        <input placeholder="المنطقة" value={area} onChange={(e) => setArea(e.target.value)}
+        <input placeholder="المنطقة" value={area} onChange={(e) => setArea(e.target.value)} onKeyDown={onKey}
           className="px-3 py-2 rounded-xl border border-black/10 outline-none text-sm" />
-        <input placeholder="عدد الغرف" type="number" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)}
+        <input placeholder="عدد الغرف" type="number" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} onKeyDown={onKey}
           className="w-28 px-3 py-2 rounded-xl border border-black/10 outline-none text-sm" />
-        <input placeholder="حالة الفرش" value={furnished} onChange={(e) => setFurnished(e.target.value)}
+        <input placeholder="حالة الفرش" value={furnished} onChange={(e) => setFurnished(e.target.value)} onKeyDown={onKey}
           className="px-3 py-2 rounded-xl border border-black/10 outline-none text-sm" />
         <button onClick={load} className="px-4 py-2 rounded-xl bg-ink-900 text-white text-sm flex items-center gap-2">
           <Search className="w-4 h-4" /> بحث
