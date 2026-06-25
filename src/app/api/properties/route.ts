@@ -4,25 +4,43 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
-  const area = p.get("area") || undefined;
-  const furnished = p.get("furnished") || undefined;
+  const area = (p.get("area") || "").trim();
+  const furnished = (p.get("furnished") || "").trim();
   const minPrice = p.get("minPrice");
   const maxPrice = p.get("maxPrice");
-  const bedrooms = p.get("bedrooms");
+  const bedroomsRaw = (p.get("bedrooms") || "").trim();
+  // استخرج رقمًا صحيحًا فقط؛ أي إدخال غير رقمي يُتجاهل بدل أن يُفرِغ النتائج
+  const bedroomsDigits = bedroomsRaw.replace(/[^\d]/g, "");
+  const bedroomsNum = bedroomsDigits ? parseInt(bedroomsDigits, 10) : NaN;
   // sold=1 ⇒ المعروض هو العقارات المُباعة فقط، غير ذلك ⇒ غير المُباعة فقط
   const onlySold = p.get("sold") === "1";
 
+  // نبني شروط البحث ديناميكيًا (الشروط تُدمج بـ AND فيما بينها)
+  const where: any = { isSold: onlySold };
+
+  // «المنطقة»: ابحث في حقل المنطقة أو المدينة معًا، دون حساسية لحالة الأحرف
+  if (area) {
+    where.OR = [
+      { area: { contains: area, mode: "insensitive" } },
+      { city: { contains: area, mode: "insensitive" } },
+    ];
+  }
+  // «حالة الفرش»: مطابقة جزئية دون حساسية لحالة الأحرف
+  if (furnished) {
+    where.furnishedStatus = { contains: furnished, mode: "insensitive" };
+  }
+  // «عدد الغرف»: مطابقة دقيقة فقط إذا كان الإدخال رقمًا صالحًا
+  if (!Number.isNaN(bedroomsNum)) {
+    where.bedrooms = bedroomsNum;
+  }
+  // نطاق السعر (اختياري)
+  const priceFilter: any = {};
+  if (minPrice && !Number.isNaN(Number(minPrice))) priceFilter.gte = Number(minPrice);
+  if (maxPrice && !Number.isNaN(Number(maxPrice))) priceFilter.lte = Number(maxPrice);
+  if (Object.keys(priceFilter).length) where.price = priceFilter;
+
   const properties = await prisma.property.findMany({
-    where: {
-      isSold: onlySold,
-      area: area ? { contains: area, mode: "insensitive" } : undefined,
-      furnishedStatus: furnished ? { contains: furnished } : undefined,
-      bedrooms: bedrooms ? Number(bedrooms) : undefined,
-      price: {
-        gte: minPrice ? Number(minPrice) : undefined,
-        lte: maxPrice ? Number(maxPrice) : undefined,
-      },
-    },
+    where,
     orderBy: onlySold ? { soldAt: "desc" } : { createdAt: "desc" },
     take: 200,
     include: {
