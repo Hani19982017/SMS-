@@ -259,6 +259,9 @@ model Property {
   price           Float?
   paymentType     String?  // كاش / تقسيط / إيجار
   availability    String?  // متاح / غير متاح / تم التأجير
+  isSold          Boolean  @default(false) // تم البيع؟
+  soldAt          DateTime? // تاريخ تعليم العقار كمُباع
+  profit          Float?   // المكسب / العمولة من بيع العقار
   ownerPhone      String?
   notes           String?  @db.Text
   createdAt       DateTime @default(now())
@@ -269,6 +272,7 @@ model Property {
   @@index([price])
   @@index([bedrooms])
   @@index([availability])
+  @@index([isSold])
 }
 
 // ----------------------- المتابعات -----------------------
