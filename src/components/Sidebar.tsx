@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Send, MessageSquare, Target,
-  Building2, CalendarClock, Settings, Home, FileText, Phone,
+  Building2, CalendarClock, Settings, Home, FileText, Phone, BadgeCheck,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -16,6 +16,7 @@ const NAV = [
   { href: "/conversations", label: "المحادثات", icon: MessageSquare },
   { href: "/leads", label: "العملاء المحتملون", icon: Target },
   { href: "/properties", label: "العقارات", icon: Building2 },
+  { href: "/properties/sold", label: "العقارات المُباعة", icon: BadgeCheck },
   { href: "/follow-ups", label: "المتابعات", icon: CalendarClock },
   { href: "/settings", label: "الإعدادات", icon: Settings },
 ];
