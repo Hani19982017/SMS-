@@ -9,9 +9,12 @@ export async function GET(req: NextRequest) {
   const minPrice = p.get("minPrice");
   const maxPrice = p.get("maxPrice");
   const bedrooms = p.get("bedrooms");
+  // sold=1 ⇒ المعروض هو العقارات المُباعة فقط، غير ذلك ⇒ غير المُباعة فقط
+  const onlySold = p.get("sold") === "1";
 
   const properties = await prisma.property.findMany({
     where: {
+      isSold: onlySold,
       area: area ? { contains: area, mode: "insensitive" } : undefined,
       furnishedStatus: furnished ? { contains: furnished } : undefined,
       bedrooms: bedrooms ? Number(bedrooms) : undefined,
@@ -20,7 +23,7 @@ export async function GET(req: NextRequest) {
         lte: maxPrice ? Number(maxPrice) : undefined,
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: onlySold ? { soldAt: "desc" } : { createdAt: "desc" },
     take: 200,
     include: {
       ownerContact: { select: { name: true, phone: true } },
@@ -30,7 +33,18 @@ export async function GET(req: NextRequest) {
     },
   });
 
+  // ملخّص المبيعات: إجمالي عدد المُباع وإجمالي المكسب (على كل المُباع، وليس أول 200 فقط)
+  const agg = await prisma.property.aggregate({
+    where: { isSold: true },
+    _count: true,
+    _sum: { profit: true },
+  });
+
   return NextResponse.json({
+    summary: {
+      soldCount: agg._count,
+      totalProfit: agg._sum.profit || 0,
+    },
     properties: properties.map((pr) => ({
       id: pr.id,
       area: pr.area,
@@ -49,6 +63,9 @@ export async function GET(req: NextRequest) {
       price: pr.price,
       paymentType: pr.paymentType,
       availability: pr.availability,
+      isSold: pr.isSold,
+      soldAt: pr.soldAt,
+      profit: pr.profit,
       ownerPhone: pr.ownerPhone,
       ownerName: pr.ownerContact?.name || null,
       classification: pr.conversation?.classification || null,
