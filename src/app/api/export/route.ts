@@ -22,15 +22,23 @@ export async function GET(req: NextRequest) {
     }));
     filename = "contacts.xlsx";
   } else if (type === "properties") {
-    const data = await prisma.property.findMany();
+    // sold=1 ⇒ المُباع فقط، sold=0 ⇒ غير المُباع فقط، بدون المعامل ⇒ الكل
+    const soldParam = req.nextUrl.searchParams.get("sold");
+    const where =
+      soldParam === "1" ? { isSold: true } : soldParam === "0" ? { isSold: false } : {};
+    const data = await prisma.property.findMany({ where });
     rows = data.map((p) => ({
       المدينة: p.city, المنطقة: p.area, "المساحة م²": p.sizeSqm, النوع: p.propertyType, "الغرف": p.bedrooms,
       "الحمامات": p.bathrooms, الفرش: p.furnishedStatus, "التشطيب": p.finishingStatus,
       "التكييفات": p.airConditioning, "المطبخ": p.kitchen, "الجراج": p.garage, "مميزات إضافية": p.features,
       السعر: p.price,
-      "التوفر": p.availability, "هاتف المالك": p.ownerPhone, ملاحظات: p.notes,
+      "التوفر": p.availability,
+      "تم البيع": p.isSold ? "نعم" : "لا",
+      "تاريخ البيع": p.soldAt ? new Date(p.soldAt).toLocaleDateString("ar-EG") : "",
+      "المكسب": p.profit,
+      "هاتف المالك": p.ownerPhone, ملاحظات: p.notes,
     }));
-    filename = "properties.xlsx";
+    filename = soldParam === "1" ? "sold-properties.xlsx" : "properties.xlsx";
   } else if (type === "leads") {
     const data = await prisma.conversation.findMany({ include: { contact: true } });
     rows = data.map((c) => ({
